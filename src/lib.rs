@@ -47,22 +47,22 @@ pub type SV<U> = SVstruct<FnvIndexMap<&'static [u8], ValueRec, U>>;
 
 pub trait AddValue {
     fn add_bool_value (&mut self, name: &'static [u8], value_in: bool, only_pos_front: bool
-    ) -> Result<bool, AddError> {
+    ) -> Result<(), AddError> {
         Ok(self.add_value(name, ValueType::Bool, i32::from(value_in), only_pos_front)?)
     }
     
     fn add_int_value (&mut self, name: &'static [u8], value_in: i32
-    ) -> Result<bool, AddError> {
+    ) -> Result<(), AddError> {
         Ok(self.add_value(name, ValueType::Int, value_in, false)?)
     }
     
     fn add_float_value (&mut self, name: &'static [u8], value_in: f32
-    ) -> Result<bool, AddError> {
+    ) -> Result<(), AddError> {
         Ok(self.add_value(name, ValueType::Float, value_in.to_bits() as i32, false)?)
     }
     
     fn add_value (&mut self, name: &'static [u8], vtype: ValueType, val: i32, only_pos_front: bool
-    ) -> Result<bool, AddError>;
+    ) -> Result<(), AddError>;
 }
 
 macro_rules! impl_add_value {
@@ -76,15 +76,14 @@ macro_rules! impl_add_value {
                 }
             }
             
-            pub fn is_full(&self) -> bool {
-                self.current == PACKET_SZ-1
-            }
-            
-            pub fn next(&mut self) {
+            pub fn next<F>(&mut self, f: F)
+            where
+                F: FnOnce(&Self) {
                 let previous = self.current;
                 self.current += 1;
                 if self.current >= PACKET_SZ {
                     self.current -= PACKET_SZ;
+                    f(self);
                 }
                 for (_, v) in self.map.iter_mut() {
                     v.vals[self.current] = v.vals[previous]
@@ -99,7 +98,7 @@ macro_rules! impl_add_value {
                 vtype: ValueType,
                 val: i32,
                 only_pos_front: bool
-            ) -> Result<bool, AddError> {
+            ) -> Result<(), AddError> {
                 if !self.map.contains_key(name) {
                     let len = name.len();
                     if (len == 0) || (len >= NAME_SZ) ||
@@ -117,7 +116,7 @@ macro_rules! impl_add_value {
                 //vr.vals[self.current] = val; // if interrupt breaks assignment
                 vr.is_only_front = only_pos_front;
                 
-                Ok(self.is_full())
+                Ok(())
             }
         }
     };
