@@ -83,7 +83,7 @@ macro_rules! impl_add_value {
             pub fn next(&mut self) {
                 let previous = self.current;
                 self.current += 1;
-                if self.current > PACKET_SZ {
+                if self.current >= PACKET_SZ {
                     self.current -= PACKET_SZ;
                 }
                 for (_, v) in self.map.iter_mut() {
