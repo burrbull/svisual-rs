@@ -2,7 +2,7 @@
 
 use core::i32;
 
-use heapless::FnvIndexMap;
+use heapless::LinearMap;
 
 pub const NAME_SZ : usize = 24;
 pub const PACKET_SZ : usize = 10;
@@ -43,7 +43,7 @@ pub struct SVstruct<M> {
     pub map: M
 }
 
-pub type SV<U> = SVstruct<FnvIndexMap<&'static [u8], ValueRec, U>>;
+pub type SV<U> = SVstruct<LinearMap<&'static [u8], ValueRec, U>>;
 
 pub trait AddValue {
     fn add_bool_value (&mut self, name: &'static [u8], value_in: bool, only_pos_front: bool
@@ -72,7 +72,7 @@ macro_rules! impl_add_value {
             pub fn new() -> Self {
                 Self {
                     current: 0,
-                    map: FnvIndexMap::new()
+                    map: LinearMap::new()
                 }
             }
             
@@ -99,7 +99,7 @@ macro_rules! impl_add_value {
                 val: i32,
                 only_pos_front: bool
             ) -> Result<(), AddError> {
-                if !self.map.contains_key(name) {
+                if !self.map.contains_key(&name) {
                     let len = name.len();
                     if (len == 0) || (len >= NAME_SZ) ||
                     (name == b"=end=") || (name == b"=begin=") {
