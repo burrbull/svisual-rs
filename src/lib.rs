@@ -77,7 +77,7 @@ macro_rules! impl_add_value {
             }
             
             pub fn is_full(&self) -> bool {
-                self.current == PACKET_SZ
+                self.current == PACKET_SZ-1
             }
             
             pub fn next(&mut self) {
