@@ -4,12 +4,10 @@ use core::i32;
 
 use heapless::LinearMap;
 use generic_array::GenericArray;
-use typenum::marker_traits::PowerOfTwo;
 use generic_array::sequence::GenericSequence;
+use typenum::marker_traits::PowerOfTwo;
 
 pub const NAME_SZ : usize = 24;
-pub const PACKET_SZ : usize = 10;
-pub const VL_SZ : usize = (NAME_SZ+4+PACKET_SZ*4);
 
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub enum ValueType {
@@ -25,13 +23,13 @@ pub struct ValueRec<P> where P: generic_array::ArrayLength<i32> {
     pub vals : GenericArray<i32, P>,
 }
 
-impl<P> ValueRec<P>  where P: generic_array::ArrayLength<i32> {
+impl<P> ValueRec<P> where P: generic_array::ArrayLength<i32> {
     pub fn new(vtype: ValueType) -> ValueRec<P> {
         ValueRec {
             is_active: false,
             is_only_front: false,
             vtype,
-            vals: GenericArray::generate(|_| 0i32)
+            vals: GenericArray::generate(|_| {0i32})
         }
     }
 }
@@ -70,8 +68,8 @@ pub trait AddValue {
 
 impl<N, P> SV<N, P>
 where
-N: heapless::ArrayLength<(&'static [u8], ValueRec<P>)> + PowerOfTwo,
-P: generic_array::ArrayLength<i32>
+    N: heapless::ArrayLength<(&'static [u8], ValueRec<P>)> + PowerOfTwo,
+    P: generic_array::ArrayLength<i32> + typenum::marker_traits::Unsigned
 {
     pub fn new() -> Self {
         Self {
@@ -85,8 +83,9 @@ P: generic_array::ArrayLength<i32>
         F: FnOnce(&Self) {
         let previous = self.current;
         self.current += 1;
-        if self.current >= PACKET_SZ {
-            self.current -= PACKET_SZ;
+        let packet_size = P::to_usize();
+        if self.current >= packet_size {
+            self.current -= packet_size;
             f(self);
         }
         for (_, v) in self.map.iter_mut() {
@@ -97,8 +96,8 @@ P: generic_array::ArrayLength<i32>
 
 impl<N, P> AddValue for SV<N, P>
 where
-N: heapless::ArrayLength<(&'static [u8], ValueRec<P>)> + PowerOfTwo,
-P: generic_array::ArrayLength<i32>
+    N: heapless::ArrayLength<(&'static [u8], ValueRec<P>)>,
+    P: generic_array::ArrayLength<i32>
 {
     fn add_value(
         &mut self,
