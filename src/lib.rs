@@ -36,7 +36,6 @@ impl<P> ValueRec<P> where P: generic_array::ArrayLength<i32> {
 
 pub enum AddError {
     MapOverflow,
-    BadName,
 }
 
 pub struct SVstruct<M> {
@@ -107,11 +106,8 @@ where
         only_pos_front: bool
     ) -> Result<(), AddError> {
         if !self.map.contains_key(&name) {
-            let len = name.len();
-            if (len == 0) || (len >= NAME_SZ) ||
-            (name == b"=end=") || (name == b"=begin=") {
-                return Err(AddError::BadName);
-            }
+            debug_assert!((name.len() > 0) && (name.len() <= NAME_SZ));
+            debug_assert!((name != b"=end=") && (name != b"=begin="));
             if self.map.insert(name, ValueRec::new(vtype)).is_err() {
                 return Err(AddError::MapOverflow);
             }
@@ -120,7 +116,6 @@ where
         let vr = self.map.get_mut(name).unwrap();
         vr.vals[self.current] = val;
         vr.is_active = true;
-        //vr.vals[self.current] = val; // if interrupt breaks assignment
         vr.is_only_front = only_pos_front;
         
         Ok(())
