@@ -1,3 +1,6 @@
+[![crates.io](https://img.shields.io/crates/v/svisual.svg)](https://crates.io/crates/svisual)
+[![crates.io](https://img.shields.io/crates/d/svisual.svg)](https://crates.io/crates/svisual)
+
 # SVisual-rs
 
 Base Rust structures and traits for [SVisual](https://github.com/Tyill/SVisual/) client.
