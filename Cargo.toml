@@ -1,6 +1,6 @@
 [package]
 name = "svisual"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Andrey Zgarbul <zgarbul.andrey@gmail.com>"]
 edition = "2018"
 description = "Base Rust structures and traits for SVisual client"
@@ -10,6 +10,6 @@ readme = "README.md"
 license = "MIT/Apache-2.0"
 
 [dependencies]
-heapless = "0.4.0"
+heapless = "0.5.0"
 generic-array = "0.13.0"
 typenum = "1.10"
