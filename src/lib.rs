@@ -16,6 +16,7 @@ pub enum ValueType {
     Float = 2,
 }
 
+#[derive(Clone)]
 pub struct ValueRec<P> where P: generic_array::ArrayLength<i32> {
     pub is_active     : bool,
     pub is_only_front : bool,
@@ -38,6 +39,7 @@ pub enum AddError {
     MapOverflow,
 }
 
+#[derive(Clone,Copy)]
 pub struct SVstruct<M> {
     current: usize,
     pub map: M
