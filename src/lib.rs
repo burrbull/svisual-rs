@@ -99,6 +99,17 @@ impl<const N: usize, const P: usize> SVMap<N, P> {
             map: LinearMap::new(),
         }
     }
+
+    /// Checks if package is empty
+    pub fn is_first(&self) -> bool {
+        self.current == 0
+    }
+
+    /// Checks if package is full
+    pub fn is_last(&self) -> bool {
+        self.current == P - 1
+    }
+    
     fn set_value(
         &mut self,
         name: &'static str,
