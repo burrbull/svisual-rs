@@ -14,5 +14,5 @@ embedded-hal = "0.2.4"
 nb = "0.1.1"
 
 [dependencies.heapless]
-git = "https://github.com/burrbull/heapless"
+git = "https://github.com/japaric/heapless"
 branch = "const_generics"
