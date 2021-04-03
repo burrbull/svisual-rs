@@ -120,12 +120,12 @@ impl<const N: usize, const P: usize> AddValue for SV<N, P> {
     }
 }
 
-pub trait SendPackage<const N: usize, const P: usize> {
+pub trait SendPackage<V> {
     type Error;
-    fn send_package(&mut self, module: &'static str, values: &SV<N, P>) -> Result<(), Self::Error>;
+    fn send_package(&mut self, module: &'static str, values: &V) -> Result<(), Self::Error>;
 }
 
-impl<Tx, const N: usize, const P: usize> SendPackage<N, P> for Tx
+impl<Tx, const N: usize, const P: usize> SendPackage<SV<N, P>> for Tx
 where
     Tx: Write<u8>,
 {
