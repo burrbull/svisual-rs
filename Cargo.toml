@@ -9,6 +9,10 @@ keywords = ["no-std", "embedded"]
 readme = "README.md"
 license = "MIT/Apache-2.0"
 
+[dependencies]
+embedded-hal = "0.2.4"
+nb = "0.1.1"
+
 [dependencies.heapless]
 git = "https://github.com/burrbull/heapless"
 branch = "const_generics"
