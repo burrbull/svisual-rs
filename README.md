@@ -10,7 +10,7 @@ For example of implementation see [svisual-stm32f1](https://github.com/burrbull/
 ### Usage
 
 Let's measure 2 variables each 100ms and send them after 15 values be measured.
-```
+```rust
     let (mut tx, _) = Serial::usart3(
         p.USART3,
         (tx, rx),
