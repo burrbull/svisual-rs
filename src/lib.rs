@@ -9,9 +9,6 @@ use embedded_hal::serial::Write;
 use heapless::LinearMap;
 use nb;
 
-/// Maximum length of module/signal name
-pub const NAME_SZ: usize = 24;
-
 /// Boolean signal that shows only positive front impulses
 pub struct OnlyFront(pub bool);
 
@@ -51,12 +48,6 @@ impl<const P: usize> ValueRec<P> {
 pub enum AddError {
     /// Overflow of container
     MapOverflow,
-}
-
-/// Filling Record
-pub trait SetValue<T> {
-    /// Update value of specified type at current time position
-    fn set(&mut self, name: &'static str, value: T) -> Result<(), AddError>;
 }
 
 /// Go to next sendable value position
@@ -109,7 +100,7 @@ impl<const N: usize, const P: usize> SVMap<N, P> {
     pub fn is_last(&self) -> bool {
         self.current == P - 1
     }
-    
+
     fn set_value(
         &mut self,
         name: &'static str,
@@ -118,8 +109,6 @@ impl<const N: usize, const P: usize> SVMap<N, P> {
         only_pos_front: bool,
     ) -> Result<(), AddError> {
         if !self.map.contains_key(&name) {
-            debug_assert!((name.len() > 0) && (name.len() <= NAME_SZ));
-            debug_assert!((name != "=end=") && (name != "=begin="));
             if self.map.insert(name, ValueRec::new(vtype)).is_err() {
                 return Err(AddError::MapOverflow);
             }
@@ -131,26 +120,52 @@ impl<const N: usize, const P: usize> SVMap<N, P> {
 
         Ok(())
     }
+
+    /// Update value of specified type at current time position
+    pub fn set<T: Value>(&mut self, name: &'static Name, value: T) -> Result<(), AddError> {
+        self.set_value(name, T::TYPE, value.to_i32(), T::ONLY_FRONT)
+    }
 }
 
-impl<const N: usize, const P: usize> SetValue<i32> for SVMap<N, P> {
-    fn set(&mut self, name: &'static str, value: i32) -> Result<(), AddError> {
-        self.set_value(name, ValueType::Int, value, false)
+/// Supported value transfer type
+pub trait Value {
+    /// Associated `[ValueType]`
+    const TYPE: ValueType;
+    /// Only positive front
+    const ONLY_FRONT: bool;
+    /// `i32` representation
+    fn to_i32(self) -> i32;
+}
+
+impl Value for i32 {
+    const TYPE: ValueType = ValueType::Int;
+    const ONLY_FRONT: bool = false;
+    fn to_i32(self) -> i32 {
+        self
     }
 }
-impl<const N: usize, const P: usize> SetValue<f32> for SVMap<N, P> {
-    fn set(&mut self, name: &'static str, value: f32) -> Result<(), AddError> {
-        self.set_value(name, ValueType::Float, value as i32, false)
+
+impl Value for f32 {
+    const TYPE: ValueType = ValueType::Float;
+    const ONLY_FRONT: bool = false;
+    fn to_i32(self) -> i32 {
+        self.to_bits() as i32
     }
 }
-impl<const N: usize, const P: usize> SetValue<bool> for SVMap<N, P> {
-    fn set(&mut self, name: &'static str, value: bool) -> Result<(), AddError> {
-        self.set_value(name, ValueType::Bool, value as i32, false)
+
+impl Value for bool {
+    const TYPE: ValueType = ValueType::Bool;
+    const ONLY_FRONT: bool = false;
+    fn to_i32(self) -> i32 {
+        self as i32
     }
 }
-impl<const N: usize, const P: usize> SetValue<OnlyFront> for SVMap<N, P> {
-    fn set(&mut self, name: &'static str, value: OnlyFront) -> Result<(), AddError> {
-        self.set_value(name, ValueType::Bool, value.0 as i32, true)
+
+impl Value for OnlyFront {
+    const TYPE: ValueType = ValueType::Bool;
+    const ONLY_FRONT: bool = false;
+    fn to_i32(self) -> i32 {
+        self.0 as i32
     }
 }
 
@@ -176,7 +191,7 @@ pub trait SendPackage<V> {
     /// Error type
     type Error;
     /// Send package with module name
-    fn send_package(&mut self, module: &'static str, values: &V) -> Result<(), Self::Error>;
+    fn send_package(&mut self, module: &'static Name, values: &V) -> Result<(), Self::Error>;
 }
 
 /// Implementation of SendPackage for all that support `embedded-hal::serial::Write`
@@ -187,55 +202,84 @@ where
     type Error = nb::Error<<Tx as Write<u8>>::Error>;
     fn send_package(
         &mut self,
-        module: &'static str,
+        module: &'static Name,
         values: &SVMap<N, P>,
     ) -> Result<(), Self::Error> {
-        // Start send of package
-        for &b in b"=begin=" {
-            self.write(b)?;
-        }
-
-        let vl_size = NAME_SZ + 4 + P * 4;
+        use core::iter::repeat;
+        let vl_size = Name::MAX_SIZE + 4 + P * 4;
         // Full package size
-        let full_size = (NAME_SZ + vl_size * values.map.len()) as u32;
-        for &b in &full_size.to_le_bytes() {
+        let full_size = (Name::MAX_SIZE + vl_size * values.map.len()) as u32;
+
+        // Open package
+        for b in "=begin="
+            .bytes()
+            .chain(full_size.to_le_bytes().iter().cloned())
+            // Identifier (name) of the module
+            .chain(module.bytes())
+            .chain(repeat(0).take(Name::MAX_SIZE - module.len()))
+        {
             self.write(b)?;
-        }
-        // Identifier (name) of the module
-        for b in module.bytes() {
-            self.write(b)?;
-        }
-        for _ in 0..NAME_SZ - module.len() {
-            self.write(0)?;
         }
 
-        for (&k, v) in values.map.iter() {
+        for (&name, v) in values.map.iter() {
             // Identifier (name) of signal
-            for b in k.bytes() {
+            for b in name
+                .bytes()
+                .chain(repeat(0).take(Name::MAX_SIZE - name.len()))
+                // Signal type
+                .chain((v.vtype as i32).to_le_bytes().iter().cloned())
+                // Values of one signal in package
+                .chain(v.vals.iter().flat_map(|val| val.to_le_bytes()))
+            {
                 self.write(b)?;
-            }
-            for _ in 0..NAME_SZ - k.len() {
-                self.write(0)?;
-            }
-
-            // Signal type
-            for &b in &(v.vtype as i32).to_le_bytes() {
-                self.write(b)?;
-            }
-
-            // Values of 1 signal in package
-            for val in &v.vals {
-                for &b in &val.to_le_bytes() {
-                    self.write(b)?;
-                }
             }
         }
 
-        // Finish send of package
-        for &b in b"=end=" {
+        // Close package
+        for b in "=end=".bytes() {
             self.write(b)?;
         }
 
         Ok(())
     }
+}
+
+/// Compile-time chacked name string
+pub struct Name(&'static str);
+
+impl core::ops::Deref for Name {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
+impl Name {
+    /// Maximum length of module/signal name
+    const MAX_SIZE: usize = 24;
+
+    /// New name instance
+    pub const fn new(name: &'static str) -> Self {
+        assert!(!name.is_empty());
+        assert!(name.len() < Self::MAX_SIZE);
+        assert!(!equal(name, "=end="));
+        assert!(!equal(name, "=begin="));
+        Self(name)
+    }
+}
+
+const fn equal(first: &'static str, second: &'static str) -> bool {
+    if first.len() != second.len() {
+        return false;
+    }
+    let fb = first.as_bytes();
+    let sb = second.as_bytes();
+    let mut i = 0;
+    while i < first.len() {
+        if fb[i] != sb[i] {
+            return false;
+        }
+        i += 1;
+    }
+    true
 }
