@@ -5,6 +5,9 @@
 #![no_std]
 #![deny(missing_docs)]
 
+/// Prelude module for easy import
+pub mod prelude;
+
 use embedded_hal::serial::Write;
 use heapless::LinearMap;
 use nb;
@@ -197,9 +200,9 @@ pub trait SendPackage<V> {
 /// Implementation of SendPackage for all that support `embedded-hal::serial::Write`
 impl<Tx, const N: usize, const P: usize> SendPackage<SVMap<N, P>> for Tx
 where
-    Tx: Write<u8>,
+    Tx: WriteIter,
 {
-    type Error = nb::Error<<Tx as Write<u8>>::Error>;
+    type Error = <Tx as WriteIter>::Error;
     fn send_package(
         &mut self,
         module: &'static Name,
@@ -211,34 +214,32 @@ where
         let full_size = (Name::MAX_SIZE + vl_size * values.map.len()) as u32;
 
         // Open package
-        for b in "=begin="
-            .bytes()
-            .chain(full_size.to_le_bytes().iter().cloned())
-            // Identifier (name) of the module
-            .chain(module.bytes())
-            .chain(repeat(0).take(Name::MAX_SIZE - module.len()))
-        {
-            self.write(b)?;
-        }
+        self.bwrite_iter(
+            "=begin="
+                .bytes()
+                .chain(full_size.to_le_bytes().iter().cloned())
+                // Identifier (name) of the module
+                .chain(module.bytes())
+                .chain(repeat(0).take(Name::MAX_SIZE - module.len())),
+        )?;
+        self.bflush()?;
 
         for (&name, v) in values.map.iter() {
             // Identifier (name) of signal
-            for b in name
-                .bytes()
-                .chain(repeat(0).take(Name::MAX_SIZE - name.len()))
-                // Signal type
-                .chain((v.vtype as i32).to_le_bytes().iter().cloned())
-                // Values of one signal in package
-                .chain(v.vals.iter().flat_map(|val| val.to_le_bytes()))
-            {
-                self.write(b)?;
-            }
+            self.bwrite_iter(
+                name.bytes()
+                    .chain(repeat(0).take(Name::MAX_SIZE - name.len()))
+                    // Signal type
+                    .chain((v.vtype as i32).to_le_bytes().iter().cloned())
+                    // Values of one signal in package
+                    .chain(v.vals.iter().flat_map(|val| val.to_le_bytes())),
+            )?;
+            self.bflush()?;
         }
 
         // Close package
-        for b in "=end=".bytes() {
-            self.write(b)?;
-        }
+        self.bwrite_iter("=end=".bytes())?;
+        self.bflush()?;
 
         Ok(())
     }
@@ -282,4 +283,34 @@ const fn equal(first: &'static str, second: &'static str) -> bool {
         i += 1;
     }
     true
+}
+
+/// Write iterator
+pub trait WriteIter {
+    /// Error type
+    type Error;
+    /// Blocking write of iterator
+    fn bwrite_iter<WI>(&mut self, bytes: WI) -> Result<(), Self::Error>
+    where
+        WI: Iterator<Item = u8>;
+    /// Blocking flush
+    fn bflush(&mut self) -> Result<(), Self::Error>;
+}
+
+impl<Tx> WriteIter for Tx
+where
+    Tx: Write<u8>,
+{
+    type Error = <Tx as Write<u8>>::Error;
+
+    fn bwrite_iter<WI>(&mut self, mut bytes: WI) -> Result<(), Self::Error>
+    where
+        WI: Iterator<Item = u8>,
+    {
+        bytes.try_for_each(|c| nb::block!(self.write(c)))
+    }
+
+    fn bflush(&mut self) -> Result<(), Self::Error> {
+        nb::block!(self.flush())
+    }
 }
