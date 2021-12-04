@@ -166,7 +166,7 @@ impl Value for bool {
 
 impl Value for OnlyFront {
     const TYPE: ValueType = ValueType::Bool;
-    const ONLY_FRONT: bool = false;
+    const ONLY_FRONT: bool = true;
     fn to_i32(self) -> i32 {
         self.0 as i32
     }

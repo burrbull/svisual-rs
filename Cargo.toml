@@ -1,6 +1,6 @@
 [package]
 name = "svisual"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Andrey Zgarbul <zgarbul.andrey@gmail.com>"]
 edition = "2018"
 description = "Base Rust structures and traits for SVisual client"
